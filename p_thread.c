@@ -1,15 +1,13 @@
-#include <pthread.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <pthread.h>
+#include <sys/time.h>
 
-struct parametros {
-    int resultado;
-    int m;
-    int n;
-    int id;
-};
+#define SIZE 16
+#define HILOS 8
+
+int resultados[SIZE];
 
 double func(int m, int n){
     if (m == 0) {
@@ -21,12 +19,21 @@ double func(int m, int n){
     }
 }
 
-void *funcionHilo(void *args) {
+struct parametros {
+    int id;
+    int* resultados;
+    int* vector;
+};
+
+void *miFuncion(void* args){
     struct parametros *p;
 
     p = ( struct parametros *) args;
+    int salto = SIZE/HILOS;
 
-    p -> resultado = func(p ->m, p-> n);
+    for(int i=0; i < SIZE/HILOS; i++){
+        p -> resultados[(salto * (p -> id)) + i] = func(3, p -> vector[(salto * (p -> id)) + i]);
+    }
 }
 
 int main(int argc, char *argv[]){
@@ -38,8 +45,6 @@ int main(int argc, char *argv[]){
     int size = argc - 1;
     int *vector = (int *)malloc(size * sizeof(int));
 
-    int *resultados = (int *)malloc(size * sizeof(int));
-
     if (vector == NULL) {
         perror("Error de asignación de memoria");
         return 1;
@@ -49,29 +54,28 @@ int main(int argc, char *argv[]){
         vector[i] = atoi(argv[i + 1]);
     }
 
+     struct timeval start, end;
 
+    gettimeofday(&start, NULL);
+    
 
+    pthread_t hilos[HILOS];
+    struct parametros *parametros_hilos = (struct parametros *)malloc(HILOS * sizeof(struct parametros));
 
-
-
-
-    clock_t start, end;
-
-    int num_hilos = 2;
-    pthread_t hilos[num_hilos];
-
-    for(int i = 0; i < num_hilos; i++){
-        struct parametros p = {1,3}
-
-
-        pthread_create(&hilos[i],NULL,funcionHilo,NULL);
+    for(int i = 0; i < HILOS; i++){
+        parametros_hilos[i].id = i;
+        parametros_hilos[i].resultados = resultados;
+        parametros_hilos[i].vector = vector;
+        
+        pthread_create(&hilos[i],NULL,miFuncion,(void*)&parametros_hilos[i]);
     }
 
-    start = clock();
+    for(int i = 0; i < HILOS; i++){
+        pthread_join(hilos[i],NULL);
+    }
 
+    gettimeofday(&end, NULL);
 
-
-    end = clock();
 
     printf("Vector: [");
     for (int i = 0; i < size; ++i) {
@@ -84,7 +88,7 @@ int main(int argc, char *argv[]){
     }
     printf("]\n");
 
-    double time = ((double)(end - start)) / CLOCKS_PER_SEC;
+    double time = (double)(end.tv_sec - start.tv_sec) + (double)(end.tv_usec - start.tv_usec) / 1000000;
 
     printf("Tiempo de ejecución: %f segundos\n", time);
 }
